@@ -1,0 +1,182 @@
+---
+title: "Clustering and Network Analysis"
+author: "Kshitiz Kafle"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: show
+---
+
+**Student ID:** 22223414  
+**Task:** Section 5 (Clustering Analysis) & Section 6 (Network Analysis)  
+**Data files required:** `movies.csv`, `cast.csv`
+
+
+```{r setup, message=FALSE, warning=FALSE}
+# Load Required Libraries
+library(dplyr)
+library(readr)
+library(tm)
+library(tidytext)
+library(igraph)
+library(ggraph)
+library(ggplot2)
+
+# Set seed for exact reproducibility
+set.seed(3020)
+```
+
+# Section 5: Clustering Analysis (RQ3 / RO3)
+
+```{r clustering-analysis, message=FALSE, warning=FALSE}
+
+# 1.1 Load Movie Data
+movies <- read_csv("movies.csv")
+
+# 1.2 Text Preprocessing Pipeline
+corpus <- Corpus(VectorSource(movies$overview))
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("en"))
+
+# Remove domain-specific filler terms
+domain_stopwords <- c("film", "story", "life", "finds", "takes", "one", "two", "new")
+corpus <- tm_map(corpus, removeWords, domain_stopwords)
+corpus <- tm_map(corpus, stripWhitespace)
+
+# 1.3 Construct TF-IDF Weighted Document-Term Matrix
+dtm_tfidf <- DocumentTermMatrix(corpus, control = list(weighting = weightTfIdf))
+dtm_tfidf_sparse <- removeSparseTerms(dtm_tfidf, 0.98)
+tfidf_matrix <- as.matrix(dtm_tfidf_sparse)
+
+# 1.4 L2-Normalization
+# Ensures Euclidean distance maps to cosine distance for Ward.D2
+tfidf_norm <- t(apply(tfidf_matrix, 1, function(x) {
+  norm <- sqrt(sum(x^2))
+  if (norm == 0) return(x) else return(x / norm)
+}))
+
+# 1.5 Calculate Distance and Hierarchical Clustering
+norm_dist <- dist(tfidf_norm, method = "euclidean")
+hclust_ward <- hclust(norm_dist, method = "ward.D2")
+
+# 1.6 Cut Tree into 4 Clusters
+clusters <- cutree(hclust_ward, k = 4)
+movies$cluster <- as.factor(clusters)
+
+cat("\nCluster Size Breakdown:\n")
+print(table(movies$cluster))
+
+# 1.7 Cluster Visualisation (PCA projection)
+pca_res <- prcomp(tfidf_norm)
+pca_df <- data.frame(
+  PC1 = pca_res$x[, 1],
+  PC2 = pca_res$x[, 2],
+  Cluster = movies$cluster
+)
+
+p_cluster <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  stat_ellipse(type = "t", level = 0.95, linetype = 2) +
+  labs(
+    title = "Movie Narrative Clusters (PCA 2D Projection)",
+    x = "Dim 1",
+    y = "Dim 2"
+  ) +
+  theme_minimal()
+
+print(p_cluster)
+
+
+# ggsave("cluster_visualization.png", plot = p_cluster, width = 8, height = 6)
+```
+
+# Section 6: Network Analysis (RQ4 / RO4)
+
+```{r network-analysis, message=FALSE, warning=FALSE}
+
+# 2.1 Load Cast Data
+cast <- read_csv("cast.csv")
+
+# 2.2 Bipartite Projection (Actor-Movie -> Actor-Actor Adjacency Matrix)
+actor_movie_pairs <- cast %>% select(actor_name, movie_id)
+actor_matrix <- table(actor_movie_pairs$actor_name, actor_movie_pairs$movie_id)
+actor_adj_matrix <- actor_matrix %*% t(actor_matrix)
+diag(actor_adj_matrix) <- 0  # Remove self-loops
+
+# 2.3 Construct Undirected Weighted Network Graph
+g <- graph_from_adjacency_matrix(
+  actor_adj_matrix,
+  mode = "undirected",
+  weighted = TRUE
+)
+
+# 2.4 Calculate Global Topological Metrics
+num_nodes <- vcount(g)
+num_edges <- ecount(g)
+net_density <- edge_density(g)
+num_components <- count_components(g)
+
+# 2.5 Extract Giant Component
+components_info <- components(g)
+giant_nodes <- V(g)[components_info$membership == which.max(components_info$csize)]
+g_giant <- induced_subgraph(g, giant_nodes)
+
+# 2.6 Filter Subgraph (Giant Component & Degree >= 5)
+subgraph_nodes <- V(g_giant)[degree(g_giant) >= 5]
+g_sub <- induced_subgraph(g_giant, subgraph_nodes)
+
+# 2.7 Output Topological Properties
+cat("\n--- Full Network Topology ---\n")
+cat("Total Nodes (V):", num_nodes, "\n")
+cat("Total Edges (E):", num_edges, "\n")
+cat("Network Density:", round(net_density, 6), "\n")
+cat("Connected Components:", num_components, "\n")
+cat(
+  "Giant Component Size:", vcount(g_giant), "(",
+  round(vcount(g_giant) / num_nodes * 100, 2), "% )\n"
+)
+
+cat("\n--- Filtered Subgraph Metrics (Giant Comp & Degree >= 5) ---\n")
+cat("Subgraph Nodes:", vcount(g_sub), "\n")
+cat("Subgraph Edges:", ecount(g_sub), "\n")
+
+# 2.8 Compute Centrality Measures
+degree_val <- degree(g)
+betweenness_val <- betweenness(g, normalized = TRUE)
+
+actor_metrics <- data.frame(
+  Actor = names(degree_val),
+  Degree = degree_val,
+  Betweenness = betweenness_val
+)
+
+cat("\nTop 10 Actors by Degree Centrality:\n")
+print(head(actor_metrics %>% arrange(desc(Degree)), 10))
+
+cat("\nTop 10 Actors by Betweenness Centrality:\n")
+print(head(actor_metrics %>% arrange(desc(Betweenness)), 10))
+
+# 2.9 Subgraph Visualization (Fruchterman-Reingold Layout)
+p_net <- ggraph(g_sub, layout = "fr") +
+  geom_edge_link(aes(width = weight), alpha = 0.2, color = "grey50") +
+  geom_node_point(aes(size = degree(g_sub)), color = "steelblue", alpha = 0.8) +
+  geom_node_text(
+    aes(label = ifelse(degree(g_sub) >= 25, name, "")),
+    repel = TRUE,
+    size = 3
+  ) +
+  scale_size_continuous(range = c(2, 8)) +
+  labs(
+    title = "Actor Collaboration Subgraph (Giant Component, Degree >= 5)",
+    size = "Degree"
+  ) +
+  theme_void()
+
+print(p_net)
+
+# ggsave("network_subgraph_visualization.png", plot = p_net, width = 10, height = 8)
+```
