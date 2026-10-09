@@ -1,0 +1,210 @@
+---
+title: "Social Web Analytics (Project)"
+author: "Aadil Joshi"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = TRUE, warning = FALSE)
+```
+
+# 2.1 Data Collection: Anatomy of a Blockbuster
+
+Data source: The Movie Database (TMDb) REST API (v3). Outputs: `movies.csv` (500 rows) and `cast.csv` (~5,000 rows).
+
+First run only: `install.packages(c("httr", "jsonlite", "dplyr", "purrr", "readr"))`
+
+```{r config}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(purrr)
+library(readr)
+
+API_KEY  <- "TMDB_API_KEY"
+BASE_URL <- "https://api.themoviedb.org/3"
+
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+set.seed(3020)          # reproducible sampling
+N_MOVIES  <- 500
+N_HORROR  <- 60         # target (>= 50 required)
+N_COMEDY  <- 60         # target (>= 50 required)
+HORROR_ID <- 27
+COMEDY_ID <- 35
+```
+
+```{r helper}
+# One API call with retries
+tmdb_get <- function(path, query = list()) {
+  query$api_key <- API_KEY
+  res <- RETRY("GET", paste0(BASE_URL, path), query = query,
+               times = 5, pause_base = 1, pause_cap = 10, quiet = TRUE)
+  stop_for_status(res)
+  fromJSON(content(res, as = "text", encoding = "UTF-8"), simplifyVector = FALSE)
+}
+
+# Quick key check: fails immediately if the key is wrong
+invisible(tmdb_get("/configuration"))
+message("API key works.")
+```
+
+## Candidate pool via /discover/movie
+
+Queried year by year (2015-2024) so we are not capped by TMDb's 500-page limit and every year is represented.
+
+```{r pool}
+discover_year <- function(year) {
+  q <- list(
+    language = "en-US",
+    with_original_language = "en",
+    `primary_release_date.gte` = paste0(year, "-01-01"),
+    `primary_release_date.lte` = paste0(year, "-12-31"),
+    `vote_count.gte` = 100,
+    `with_runtime.gte` = 60,      
+    include_adult = "false",
+    include_video = "false",
+    sort_by = "popularity.desc",
+    page = 1
+  )
+  first <- tmdb_get("/discover/movie", q)
+  pages <- min(first$total_pages, 500)
+  message(year, ": ", first$total_results, " films, ", pages, " pages")
+
+  map_dfr(seq_len(pages), function(p) {
+    q$page <- p
+    out <- if (p == 1) first else tmdb_get("/discover/movie", q)
+    map_dfr(out$results, function(m) {
+      tibble(
+        id = m$id,
+        title = m$title %||% NA_character_,
+        overview = m$overview %||% NA_character_,
+        release_date = m$release_date %||% NA_character_,
+        genre_ids = paste(unlist(m$genre_ids), collapse = "|"),
+        popularity = m$popularity %||% NA_real_,
+        vote_average = m$vote_average %||% NA_real_,
+        vote_count = m$vote_count %||% NA_integer_,
+        original_language = m$original_language %||% NA_character_
+      )
+    })
+  })
+}
+
+pool <- map_dfr(2015:2024, discover_year) %>%
+  distinct(id, .keep_all = TRUE) %>%
+  filter(!is.na(overview), trimws(overview) != "",
+         vote_count >= 100, original_language == "en") %>%
+  mutate(
+    is_horror = grepl(paste0("(^|\\|)", HORROR_ID, "(\\||$)"), genre_ids),
+    is_comedy = grepl(paste0("(^|\\|)", COMEDY_ID, "(\\||$)"), genre_ids),
+    pop_tier  = ntile(popularity, 4)   # popularity quartiles
+  )
+
+message("Candidate pool: ", nrow(pool), " films (",
+        sum(pool$is_horror), " horror, ", sum(pool$is_comedy), " comedy)")
+stopifnot(sum(pool$is_horror) >= N_HORROR, sum(pool$is_comedy) >= N_COMEDY)
+```
+
+## Stratified sample across popularity levels
+
+```{r sample}
+take_strat <- function(df, n) {
+  per <- ceiling(n / 4)
+  df %>%
+    group_by(pop_tier) %>%
+    slice_sample(n = per) %>%
+    ungroup() %>%
+    slice_sample(n = min(n, nrow(.)))
+}
+
+horror <- take_strat(filter(pool, is_horror), N_HORROR)
+comedy <- take_strat(filter(pool, is_comedy, !id %in% horror$id), N_COMEDY)
+chosen <- bind_rows(horror, comedy)
+
+rest_n <- N_MOVIES - nrow(chosen)
+rest   <- take_strat(filter(pool, !id %in% chosen$id), rest_n)
+movies <- bind_rows(chosen, rest) %>% distinct(id, .keep_all = TRUE)
+
+# top up if rounding/duplicates left us short
+while (nrow(movies) < N_MOVIES) {
+  extra <- pool %>% filter(!id %in% movies$id) %>%
+    slice_sample(n = N_MOVIES - nrow(movies))
+  movies <- bind_rows(movies, extra)
+}
+movies <- movies %>% slice_head(n = N_MOVIES)
+
+movies_out <- movies %>%
+  select(id, title, overview, release_date, genre_ids, popularity,
+         vote_average, vote_count, original_language)
+```
+
+## Top 10 credited actors per movie
+
+```{r cast}
+get_cast <- function(movie_id) {
+  Sys.sleep(0.05)
+  cr <- tryCatch(tmdb_get(paste0("/movie/", movie_id, "/credits")),
+                 error = function(e) NULL)
+  if (is.null(cr) || length(cr$cast) == 0) return(NULL)
+  cast <- cr$cast
+  ord  <- order(map_dbl(cast, ~ .x$order %||% Inf))
+  cast <- cast[ord][seq_len(min(10, length(cast)))]
+  tibble(
+    movie_id   = movie_id,
+    actor_id   = map_int(cast, ~ .x$id),
+    actor_name = map_chr(cast, ~ .x$name)
+  )
+}
+
+cast_out <- map_dfr(movies_out$id, get_cast)
+```
+
+## Integrity checks and save
+
+```{r save}
+stopifnot(
+  nrow(movies_out) == N_MOVIES,
+  !anyDuplicated(movies_out$id),
+  all(trimws(movies_out$overview) != ""),
+  all(cast_out$movie_id %in% movies_out$id)
+)
+message("Horror films: ", sum(grepl("(^|\\|)27(\\||$)", movies_out$genre_ids)))
+message("Comedy films: ", sum(grepl("(^|\\|)35(\\||$)", movies_out$genre_ids)))
+message("Cast rows: ", nrow(cast_out), " | movies with cast: ",
+        n_distinct(cast_out$movie_id))
+print(summary(movies_out[, c("popularity", "vote_average", "vote_count")]))
+
+write_csv(movies_out, "movies.csv")
+write_csv(cast_out,   "cast.csv")
+message("Saved movies.csv and cast.csv")
+```
+
+
+# Read Files:
+```{r}
+movies <- read.csv("movies.csv", col_types = cols(genre_ids = col_character()))
+```
+
+
+# ---- 1. Define the two groups ------------------------------------------
+```{r}
+has_genre <- function(x, id) grepl(paste0("(^|\\|)", id, "(\\||$)"), x)
+ 
+n_both <- sum(has_genre(movies$genre_ids, 27) & has_genre(movies$genre_ids, 35))
+cat("Films tagged BOTH horror and comedy (excluded):", n_both, "\n")
+ 
+dat <- movies %>%
+  mutate(horror = has_genre(genre_ids, 27),
+         comedy = has_genre(genre_ids, 35)) %>%
+  filter(xor(horror, comedy)) %>%      # keep films in exactly one of the two groups
+  mutate(genre = factor(if_else(horror, "Horror", "Comedy"),
+                        levels = c("Horror", "Comedy")))
+ 
+cat("\nGroup sizes:\n"); print(table(dat$genre))
+if (any(table(dat$genre) < 50))
+  warning("A group has fewer than 50 films - collect more horror/comedy films.")
+
+```
+
