@@ -1,0 +1,417 @@
+---
+title: "The Anatomy of a Blockbuster"
+subtitle: "Exploring Movie Popularity, Audience Ratings and Collaboration Networks"
+author: "COMP3020 | Group 34"
+output: pdf_document
+---
+
+
+The Anatomy of a Blockbuster:
+Exploring Movie Popularity, Audience Ratings and Collaboration Networks
+
+A Social Web Analytics Report
+
+
+ Course: Social Web Analytics 			Course Code: COMP3020
+Submission Date: 09 October 2026 		Group No: 34	    	
+Assessment 2: Social Web Analytics Group Project Report
+
+GROUP MEMBERS AND CONTRIBUTIONS
+Student Name	Student ID	Report Contribution
+Mahnoor Irshad	22131681	34%
+Aadil Joshi	22161355	33%
+Kshitiz Kafle	22223414 	33%
+		100%
+
+
+DATA SOURCE
+The Movie Database (TMDb)
+LINK
+https://developer.themoviedb.org/docs/getting-started?  
+GITHUB REPOSITORY
+https://github.com/AadilJoshi/Anatomy-of-a-Blockbuster-Movie-Data-Analysis.git 
+PRESENTED BY GROUP 34   										
+
+ Table of Contents
+THE REPORT	4
+1.	Introduction	4
+1.1 Topic and Context	4
+1.2 Aim of Investigation	4
+1.3 Research Questions	4
+2.	Data Collection and Preparation	5
+2.1 Data Source:	5
+2.2 Data Collection Method	5
+2.3 Variables and Dataset	5
+2.4 Data Cleaning and Preparation	6
+2.5 Data Collection Limitations	7
+3.	Text/Content Analysis and Visualization	7
+3.1 Method	7
+3.2 Content/Text Preparation	7
+3.3 Frequent Word Analysis	8
+3.4 Content Visualizations	9
+3.5 Results and Interpretation	9
+4.	Hypothesis Testing	10
+4.1 Research Question and Hypotheses	10
+4.2 Statistical Test and Justification	10
+4.3 Results	11
+4.4 Interpretation:	14
+5.	Clustering Analysis	14
+5.1 Method and Data Representation	14
+5.2 Distance Measure	15
+5.3 Selection of Number of Clusters	15
+5.4 Cluster Visualisation	15
+5.5 Cluster Characteristics and Interpretation	15
+6.	Network Analysis	16
+6.1 Network Construction	16
+6.2 Nodes and Edges	16
+6.3 Network Properties	16
+6.4 Full Network Visualization	17
+6.5 Subgraph Analysis	17
+6.6 Centrality Analysis	17
+6.7 Interpretation	18
+6.8 Network Limitations	18
+7.	Overall Findings and Discussion	19
+7.1 Key Findings	19
+7.2 Connections Between Analyses	19
+7.3 Limitations	20
+8. Conclusion	20
+References	21
+
+ THE REPORT
+
+1.	Introduction  
+
+1.1 Topic and Context 
+The film industry creates diverse movies with regard to their genre, narrative content, audience response, and popularity. Knowledge of the correlations between these aspects helps to learn more about audiences' preferences and the structure of the film industry. Online movie databases offer an opportunity to research such correlations based on publicly available data including movie descriptions, genres, audience ratings, movie popularity, and cast of characters. 
+Movie Database (TMDb) offers structured data on movies that can be analyzed using computational and statistical methods. The database contains movie descriptions that could be used by researchers to uncover narrative themes, movie genres, and audience ratings that allow for comparing different types of movies. Moreover, the cast of characters is useful for analyzing the network of professional collaborations between actors. 
+The current project aims at applying the social web analytics approach to analyze the aspects of movies. 
+ 
+1.2 Aim of Investigation 
+This investigation is intended to explore the connections between movie content, ratings, popularity and actors’ collaborations using information collected from TMDb. 
+In particular, the objectives of the investigation include finding recurring themes in the descriptions of movies, investigating the differences in the ratings of horror movies compared to comedy movies, finding clusters of movies based on the similarity of their plots and analyzing the connections between actors based on the movies they played in. 
+ 
+1.3 Research Questions 
+The investigation addresses four research questions: 
+RQ1: What are the most frequently occurring words and themes in movie descriptions, and how do these patterns differ between popular and less popular films? 
+RQ2: Is there a statistically significant difference in average audience ratings between horror and comedy films? 
+RQ3: Can movies be grouped into meaningful clusters based on similarities in their plot descriptions, and what themes characterize these clusters? 
+RQ4: How are actors connected through shared movie appearances, and which actors occupy the most central positions within the collaboration network? 
+Together, these questions examine textual characteristics, audience ratings, thematic similarities and collaboration structures within the selected movie dataset. 
+ 
+ 
+ 
+ 
+ 
+2.	Data Collection and Preparation 
+
+2.1 Data Source: 
+The data for the current project was gathered from The Movie Database (TMDb), an online film and television database compiled by the efforts of its registered users. Each item in TMDb includes descriptions, genre information, casting information, and user-submitted ratings and votes. The combination of such elements makes TMDb quite suitable for the analysis of movie content, ratings, popularity, and collaboration patterns, as the research aims at investigating all of these aspects. 
+TMDb can be described as a social web resource because its ratings and popularity score is based on the activities of its users, and because the records of TMDb are curated by its users rather than by any particular studio or publishing company. Data were gathered using TMDb REST API (version 3). More information about the resource can be found here: developer.themoviedb.org. A free API key is needed to access the API.  
+
+2.2 Data Collection Method 
+All collection was conducted using R. HTTP requests were done through the httr library (with retries on transient failures), jsonlite parsed the JSON responses, data handling was performed by dplyr and purrr, and the resulting files were written by readr. Requests were authenticated using my personal v3 API key. The key is loaded at the time of executing the code and is not present in the submitted repository. 
+Two API endpoints were utilized. First, the /discover/movie endpoint was utilized to construct a pool of potential movies using the following filters: original language: English; primary release date between 1st January 2015 and 31st December 2024; more than 100 votes from the audience; movie has at least 60 minutes of runtime so that short films are filtered out; does not contain any adult content. Since the /discover endpoint returns at maximum 500 pages per request, the pool was constructed by years from 2015 to 2024 and all pages per each year were requested. Second, the /movie/{id}/credits endpoint was used to get the cast of each selected movie. 
+A total of 500 films were randomly selected from the entire pool of qualified films. In order to ensure that the sample consists of films with varying degrees of popularity and not only the most popular ones, but the pool was also split up into four quartiles based on their popularity and films were randomly sampled from each quartile. To facilitate the hypothesis testing process, horror and comedy films (TMDb genre IDs 27 and 35) were randomly selected first, targeting 60 films in each category (minimum requirement was 50 films), while the other films were randomly selected afterward following the same procedure. The use of the random seed 3020 allows for the reproducibility of the sample. The top 10 cast members for each film were chosen from the data provided by TMDb. 
+ 
+2.3 Variables and Dataset 
+Collection created two interrelated CSV files. movies.csv contains one record per movie and cast.csv contains one record per actor per movie. The movie_id in cast.csv file is associated with the id in movies.csv file, hence each actor can be connected to the movie he/she acts in. 
+
+
+
+
+
+
+
+
+Table 1
+Variable 	File 	Type 	Description 
+id 	movies 	Integer 	Unique movie id from TMDb (key which is used to join both datasets) 
+title 	movies 	Text 	Name of the movie 
+overview 	movies 	Text 	Description of the plot (used during text analysis and clustering) 
+release_date 	movies 	Date 	Release date in YYYY-MM-DD format 
+genre_ids 	movies 	Text 	Genres of the movie, separated by "|", TMDb IDs (e.g. 27|53), 27 = Horror, 35 = Comedy 
+popularity 	movies 	Numeric 	Popularity score generated by TMDb based on user actions 
+vote_average 	movies 	Numeric 	Mean audience rating on 0 to 10 scale (dependent variable in RQ2) 
+vote_count 	movies 	Integer 	Amount of users who voted in order to receive vote_average 
+original_language 	movies 	Text 	Code of the original language of the movie ("en" for all movies) 
+movie_id 	cast 	Integer 	Movie ID from TMDb (matches the id from movies.csv) 
+actor_id 	cast 	Integer 	Unique person id from TMDb (of the actor) 
+actor_name 	cast 	Text 	Name of the actor (node label in the network) 
+ 
+Data size: movies.csv has data on 500 movies from 2015-2024, having nine characteristics each. cast.csv has 4844 observations (with up to 10 cast members in each movie). There are 141 horror movies and 179 comedy movies (23 movies belong to both categories). This number of observations per category exceeds the minimum required 50. 
+ 
+2.4 Data Cleaning and Preparation 
+The API data were examined and cleaned prior to analysis as follows: 
+1. Duplicates: Duplicate film IDs were eliminated, such that each film is only represented once (500 unique IDs). 
+2. Missing descriptions: Films missing an overview were excluded, as the overview was used for the textual analysis and clustering. 
+3. Eligibility: The vote count criterion (at least 100) and the original language criterion (English) were locally checked against the downloaded data. 
+4. Indicators for genres: The genre_ids attribute was transformed into the logical variables for horror (genre_id 27) and comedy (genre_id 35). Some movies belong to many genres; thus, one movie may be considered as both of them. 
+5. Test groups for hypothesis testing: In relation to RQ2, the movies marked as horror-comedy (23 movies) were removed from the sample because the two test groups should not contain the same observations. Additional genres for other movies (e.g. horror-thriller) were not removed. 
+6. Linking and validation: Automated checks confirmed the exact number of 500 rows in movies.csv, uniqueness of IDs, non-empty overviews, and the presence of all movie_id from cast.csv in movies.csv. Tokenisation, stop-word removal, and other text pre-processing steps are described in Sections 3 and 5. 
+ 
+2.5 Data Collection Limitations 
+The following limitations should be considered in the interpretation of the findings: 
+
+1.	Bias in sampling: The 500 films are a stratified sample, not a randomly chosen sample of all films; moreover, horror and comedy films have been sampled in excess to obtain appropriate sample size. Findings apply to the sample and its kind and not to the entire film industry. 
+2.	Survivorship due to vote threshold: Using only films which have at least 100 votes eliminates less prominent films. The sample is biased in favor of movies with an audience, and the rating characteristics of less known movies will not be included. 
+3.	User bias in ratings: TMDb ratings are submitted by users who access the website. The ratings may differ from the opinion of average movie-goer or critics and can be influenced by users’ fanaticism or voting organization. 
+4.	Popularity depends on date: The popularity index provided by TMDb is determined based on recent user activity and may change with time; therefore, it can be considered as a snapshot of the moment when the data was collected. 
+5.	Genre classification: Genres are given by contributors and may not be consistent. They are multi-genre in nature and are based upon how TMDb has tagged the movies. 
+6.	Plot descriptions and cast information: Plot descriptions and cast information vary in length and quality, and this could have an impact on text analysis. Only the top 10 actors for each movie have been considered for the network.  
+7.	Constraints imposed by the API. Discover API allows only 500 pages to be retrieved for one request. This is why the process of extraction had to be done year-wise. Also, there is a limit on how many requests the API can handle. The data are derived from the English language, 2015-2024 subset only, and thus conclusions cannot be drawn for any other language or time period. 
+
+3.	Text/Content Analysis and Visualization 
+
+3.1 Method 
+Text analysis was carried out based on the movie plot descriptions for 500 movies obtained from The Movie Database (TMDb) in the years 2015 to 2024. The aim was to find frequently used words and investigate if there is any difference in text patterns of more and less popular movies. 
+The text analysis was done in R using packages: tidyverse, tidytext, and scales. A bag-of-words method was utilized in the process of text analysis; single words were treated as units of analysis in accordance with text mining practices (Silge & Robinson, 2017). In the course of the text analysis, word frequency in the whole sample and word prevalence in the two samples of movies were compared. 
+The sample was divided into two equally-sized groups on the basis of the median popularity score of TMDb that was 4.94595. The movies with the scores greater than or equal to the median were treated as high popularity movies, while movies with the scores smaller than the median were treated as low popularity movies. 
+ 
+3.2 Content/Text Preparation 
+Prior to analysis, the data was checked for any lack of description or duplicate movie IDs. No missing descriptions nor duplicate movie IDs were found as all 500 movies had relevant descriptions. 
+The descriptions were tokenized into individual words using the unnest_tokens() function, along with changing the case of the text to lower-case. The common English stopwords like the, and, and is were filtered out using the tidytext stopword list. These processes are part of the typical methods used in the preprocessing of the text data in order to eliminate any non-informative words from the data set (Silge & Robinson, 2017). Any tokens with numbers or non-letter characters and words less than three characters were discarded. 
+There were 21,844 word tokens in the descriptions prior to preprocessing. Post-preprocessing, only 10,088 tokens are left, which include 4,622 unique words. 
+ 
+3.3 Frequent Word Analysis 
+An analysis was performed to establish the 20 words that are the most frequently used in the movie descriptions out of the total 500 movie descriptions analyzed. 
+As shown in Figure 1, some of the most frequently used words include life, world, family, woman, friends, and home. Life is the most frequently used word followed by world and family. 
+The frequent use of words such as family and experiences shows that there is presence of narratives based on interactions in the data set. On the other hand, words like world, mysterious, save, and secret suggest that there are narratives related to adventures, suspense, and conflict in the dataset. 
+
+ 
+Figure 1 Twenty most frequently occurring words in movie descriptions. 
+ 
+
+
+
+
+3.4 Content Visualizations 
+Two visualizations were developed to summaries textual patterns and investigate their relationship with movie popularity. 
+Figure 1 presents a horizontal bar chart showing the 20 most frequent words across all movie descriptions. The chart enables straightforward comparison of word frequencies and highlights recurring narrative vocabulary. 
+Figure 2 compares the prevalence of selected words between higher-popularity and lower-popularity movies. Popularity groups were established using the median TMDb popularity score. For each word, the proportion of movies mentioning that word was calculated separately for each group. 
+The difference between these percentages was then used to identify words that were more common in either group. Only words appearing in at least eight movies were considered, reducing the influence of extremely rare terms. 
+As shown in Figure 2, words such as world, powerful, mysterious, events, and war appeared more frequently in higher-popularity movie descriptions. In contrast, words including relationship, mother, zombie, love, and dreams were more prevalent among lower-popularity movies. 
+
+ 
+Figure 2  Differences in word prevalence between higher- and lower-popularity movies, measured in percentage points.
+ 
+3.5 Results and Interpretation 
+In addition, the analysis found several recurring narrative elements in the movie descriptions sampled, namely those associated with personal experiences, family interactions, conflicts and mysteries. 
+Finally, the comparative analysis found differences in vocabulary used between popularity groups. Movies with higher popularity were associated with a larger number of words indicative of a large-scale conflict, mystery and adventure, while movies with lower popularity were characterized by a relatively higher frequency of words related to relationships, family experience and some horror narratives. 
+Yet, it is necessary to interpret these results with caution. The analysis focused on words themselves and not on complete narrative structures, which means that context and semantics of words were not always clear. Moreover, differences in frequencies of words observed were relatively small and do not imply any causal relationships. 
+Overall, the results indicate that there are patterns of text associated with popularity differences in TMDb. Still, further analysis is needed to verify if these patterns persist in case of controlling for other movie attributes such as genre or year of release. 
+ 
+4.	Hypothesis Testing 
+
+4.1 Research Question and Hypotheses 
+One of the key measures of how a film is perceived by an audience is audience ratings. Hence, RQ2 considers two genres – horror and comedy – that are different in nature and equally represented in the sample and checks whether the way the film is received is influenced by its genre. 
+RQ2: Is there a statistically significant difference in mean audience ratings for horror and comedy films? 
+The dependent variable in the research question is vote_average – mean user rating from TMDb on a scale from 0 to 10. Horror films have genre 27 but not 35, and comedy films have genre 35 but not 27. Then we define μ(horror) and μ(comedy) as the mean ratings of the two populations. 
+H₀: The mean ratings of horror and comedy films are the same, μ(horror) = μ(comedy). 
+H₁: The mean ratings of horror and comedy films are not the same, μ(horror) ≠ μ(comedy). 
+This is a two-tailed test since the problem is asking for a difference regardless of direction, and the level of significance is α = 0.05. 
+
+4.2 Statistical Test and Justification 
+The selected test is Welch’s two sample t-test (independent sample t-test assuming unequal variances), among the t-tests described in COMP3020. Reasons for selecting this test are listed below: 
+Research questions and data types. RQ2 involves comparison of the means of one numeric variable (vote_average) in two groups. 
+Independent groups. Films belong to one of the groups since films belonging to both horror and comedy categories were dropped from the dataset, and each film represents an independent observation. 
+Sample size and normality. Each group contains more than 50 observations; therefore, according to the central limit theorem, the distribution of the mean is normally distributed even in case of slight skewness of the ratings. The normality of distribution was additionally verified using the Q-Q plot and Shapiro-Wilk test. 
+Unequal variances. The selected test does not involve assumptions about the equality of variance in two groups, while the pooled t-test assumes it. 
+A sensitivity analysis was conducted using the Wilcoxon rank sum test (also known as the Mann-Whitney test). This test makes no assumption about normal distribution, and convergence of both tests leads to greater certainty about the result. The size of the difference is provided with Cohen’s d and 95% confidence interval of the difference of means, since even a tiny difference can become statistically significant in a big sample size. 
+
+
+
+
+
+4.3 Results 
+Groups were generated and tests conducted using R (code: Hypothesis_Testing.Rmd in the repository). Out of the total 500 movies, 23 were marked as horror and comedy and hence excluded from consideration to leave us with 118 horror movies and 156 comedy movies.  
+ 
+ 
+ 
+ 
+Table 2
+Genre 	n 	Mean 	SD 	Median 
+Horror 	118 	5.89 	0.74 	5.90 
+Comedy 	156 	6.42 	0.67 	6.40 
+ 
+Mean and median scores of comedy movies are greater compared to those of horror movies, and both categories show the same range of scores. 
+ 
+
+Assumptions testing: In the Q-Q plot (see Figure 2), the points are near the reference line for both groups, with only minor deviations at the tails, while the Shapiro-Wilk test showed no rejection of the normal distribution assumption for both groups (Horror: W = 0.990, p = 0.512; Comedy: W = 0.991, p = 0.441). The test for equality of variance (F test) showed that there is no need to reject the null hypothesis of equal variances (F = 1.23, p = 0.232), and their values are almost identical (0.74 and 0.67). 
+ 
+Welch two-sample t-test: Films of horror genre received an average rating of 5.89 (SD = 0.74, n = 118) while comedies were rated at 6.42 (SD = 0.67, n = 156) with the difference of −0.53 points (the difference between horror and comedy). The t-value was t (237.5) = −6.15, p < 0.001 (p = 3.3 × 10⁻⁹) with the 95% confidence interval of the difference being [−0.70, −0.36]. Cohen's d = −0.76, which means the medium effect size approaching the threshold of large effect (0.8). 
+Robustness checks. The Wilcoxon rank sum test also yielded p < 0.001 with the estimated difference in location of −0.51 (95% CI [−0.70, −0.34]). 
+ 
+ 
+Figure: Descriptive Statistics of Group Sizes and Audience Rating 
+ 
+Figure: Normality Test and F Test 
+ 
+Figure: Two Sample t-test and Rank sum Test 
+
+4.4 Interpretation: 
+With a significance level of 5%, the test allows for enough evidence against the null hypothesis (p < 0.001). There are differences between the mean ratings of horror and comedy films: the latter received about 0.53 points more than horror films (the average ratings are 6.42 versus 5.89 points on a 10-point scale respectively); we can be 95% sure that the difference will be between 0.36 and 0.70 points. 
+The difference is also large enough, beyond statistical significance. The difference of about half a point is approximately 3/4 of the standard deviation (Cohen's d = −0.76, medium effect size). The checks confirm the findings: the assumptions of the t-test were appropriate, and the Wilcoxon rank-sum test, which does not rely on normality, made the same inference. This finding cannot therefore be the outcome of the chosen test. 
+Some precautions need to be made clear. First, the finding reveals a correlation between the two film types; it does not prove that horror movies are bad movies, nor can it help identify the reasons for such difference in rating (for instance, different expectations of the audience, or of the people making the ratings). Second, the sample is stratified and not random; only films with a minimum number of 100 votes are taken into consideration; 23 films belonging to both genres have been removed from the list; and finally, the ratings have been made by people voluntarily joining TMDb. 
+Considering that RQ2 addresses the aspect of reception in the framework of the entire research question set, the connection between genre and the ratings provided by the audiences becomes evident. Therefore, there arises a need to consider the relationship between the themes of the plot descriptions (section 3) and the thematic groups (section 5) on the one hand, and film ratings on the other hand. 
+ 
+5.	Clustering Analysis 
+
+5.1 Method and Data Representation 
+To discover narrative structures and themes in the sample of movies, plot summaries (overview) were extracted from movies.csv and explored via text mining and unsupervised clustering methods. Plot summary is unstructured text data that must be preprocessed systematically in order to encode in numeric vector form.                                
+  
+Preprocessing text data in R was done using the tm library. All the text data was lower-cased and stripped of all English punctuation marks, digits, and stop words (such as "the", "and", "in"). Additionally, domain-related non-informative words that commonly occurred in film descriptions (such as "film", "story", "life", "finds") were stripped out. A stream of words was performed. 
+  
+The resulting text was converted to a Document-Term Matrix (DTM) where weights corresponded to Term Frequency-Inverse Document Frequency (TF-IDF). TF-IDF is based on weighting words according to their frequency in a particular plot summary and inversely proportional to their frequency in all other summaries. Words occurring in fewer than 1% of documents were eliminated from the matrix to avoid noise. 
+ 
+5.2 Distance Measure 
+Euclidean distance is not a good choice in high dimensional text matrices since the document vectors have varying lengths depending on the plot of summary length. Cosine Distance, which is defined as $(1 - \text {Cosine Similarity}) $, was selected as the distance measure. The cosine distance takes into account the angle between the document vectors and not their distance in the TF-IDF feature space. To maintain methodological rigor while applying Ward’s agglomerative clustering. D2) on angular text vectors, feature vectors were $L_2$-normalized ($\vert {}v\vert {} _2 = 1$). Under $L_2$-norm normalization, Euclidean distance directly maps to Cosine distance ($D_ {\text {Euclidean}} ^2 = 2 \cdot D_ {\text {Cosine}} $), preserving directional angular properties while upholding Ward's variance minimization principle." 
+ 
+5.3 Selection of Number of Clusters 
+Hierarchical Agglomerative Clustering (HAC) was conducted using Ward’s minimum variance method (ward. D2), which minimizes the total within-cluster variance at each merge step. To establish the optimal cluster count ($k$), three diagnostic methods were evaluated:  
+1.	Elbow Method (Total Within-Cluster Sum of Squares): Plotting within-cluster sum of squares across $k = 2$ through $k = 10$ revealed an inflection point ("elbow") at $k = 4$. 
+2.	Average Silhouette Width: Evaluated across multiple cluster counts, peaking at $k = 4$ ($\text {mean silhouette} \approx 0.18$), confirming clear cluster boundaries without over-fragmentation. 
+3.	Dendrogram Inspection: Visual analysis of the hierarchical dendrogram showed four well-separated, balanced main branches.  
+Based on these evaluations, $k = 4$ was selected as the optimal cluster baseline. 
+ 
+ 
+5.4 Cluster Visualisation 
+The projection of the multi-dimensional TF-IDF space onto a 2D graph was done using PCA. The movies (500 in number) were plotted based on the first two principal components (Dim1 and Dim2), with each cluster indicated by different colors and the 95% concentration ellipse for each cluster. 
+
+5.5 Cluster Characteristics and Interpretation 
+Extracting the top TF-IDF terms per cluster reveals four primary narrative archetypes across the sampled films:  
+•	Cluster 1: Action, Crime & High-Stakes Operations (142 films) 
+o	Top Terms: agent, kill, cop, world, mission, save, crime, deadly.  
+o	Interpretation: Focuses on physical conflict, espionage, law enforcement, and high-stakes action thrillers.  
+•	Cluster 2: Character Dramas, Family & Relationships (128 films) 
+o	Top Terms: love, family, young, friend, woman, father, home, relationship.  
+o	Interpretation: Represents interpersonal dramas, romantic narratives, family dynamics, and coming-of-age stories.  
+•	Cluster 3: Horror, Supernatural & Survival (115 films) 
+o	Top Terms: house, haunted, evil, death, night, survive, ghost, demon.  
+o	Interpretation: Aligns strongly with TMDb Genre ID 27 (Horror), capturing themes of survival, supernatural threats, and atmospheric suspense.  
+•	Cluster 4: Sci-Fi, Fantasy & Speculative Fiction (115 films) 
+o	Top Terms: future, earth, space, alien, system, time, power, human.  
+o	Interpretation: Encompasses space exploration, futuristic technology, alien encounters, and high-concept fantasy world-building. 
+ 
+6.	Network Analysis  
+
+6.1 Network Construction 
+To study the collaboration network within the film industry, an actor co-occurrence network was created using the uploaded cast.csv file. This bipartite network data (Actor to Movie) was converted into an actor unipartite network (Actor to Actor) using matrix multiplication ($A \times A^T$). 
+
+6.2 Nodes and Edges 
+Nodes ($V$): Represent individual actors appearing in the cast lists of the sampled movies.  
+ 
+Edges ($E$): Represent shared movie appearances between pairs of actors.  
+ 
+Edge Weight ($W$): Quantifies the total number of shared movie projects between two actors across the 2015–2024 sample period.  
+ 
+Network Type: Undirected weighted network. Directionality is omitted because co-appearing in a film is a symmetric relationship. 
+ 
+6.3 Network Properties 
+ 
+Total Nodes ($\vert {} V\vert {} $): $4,132$ unique actors.  
+ 
+Total Edges ($\vert {} E\vert {}$): $21,435$ co-star links.  
+ 
+Network Density: $0.002512$. This low density indicates a highly sparse social graph, typical of real-world collaboration networks where actors work in localized project teams.  
+ 
+Connected Components: 96 distinct components.  
+ 
+Giant Component Size: The largest connected component contains $3,136$ actors ($75.90\%$ of all nodes), forming an interconnected mainstream Hollywood collaboration core. 
+ 
+6.4 Full Network Visualization 
+The full actor network was visualized utilizing the Fruchterman-Reingold Force-Directed layout. Here, node size corresponds to the value of degree centrality, and edge width indicates the number of projects that actors share together. The network consists of the dense core and several separate components that correspond to movie casts without any shared actors in the database. 
+
+6.5 Subgraph Analysis 
+The sub-graph was created to ensure that there would be no crowding effect, and the modular casting network was examined, focusing solely on the Giant Component ($N = 3,136$) of nodes with degree $k \ge 5$. 
+  
+Community Detection: The Louvain modularity algorithm ($Q = 0.68$) was used to identify the casting communities based on studios' franchises (i.e., groupings of cast members of ensemble action and comedy, and indie/horror movies). 
+
+6.6 Centrality Analysis 
+1)To evaluate actor influence and structural positioning, Degree Centrality and Betweenness Centrality were computed across the network: 
+: Degree Centrality (CD): Counts the total number of unique co-stars connected to an actor.  
+$$\text {Degree}(v) = \vert {} \ {u \in V: (v, u) \in E \} \vert {} $$ 
+ 
+2) Betweenness Centrality ($C_B$): Measures how often an actor falls on the shortest path between other pairs of actors, identifying structural "bridges" across separate cast groups.  
+$$C_B(v) = \sum_ {s \neq v \neq t} \frac{\sigma_{st}(v)} {\sigma_{st}} $$ 
+ 
+Actor Name 	Degree (Cd) 	Betweenness (CB) 	Primary Role / Industry Niche 
+Jason Sudeikis 	54 	0.030866 	Ensemble Comedies & Structural Hub with High Degree 
+Nick Frost 	54 	0.018188 	Comedic Hub of High Degree (Genres & Ensembles) 
+J.K. Simmons 	45 	0.022759 	Character Actor Multi-Genres & Network Hub 
+Keegan-Michael Key 	45 	0.021627 	Comedy Ensemble & Industry Hub 
+Nicolas Cage 	45 	0.013637 	Lead In Genres (Action / Indie Horror Ensembles) 
+Willem Dafoe 	45 	0.009886 	Cross-over Actor (Indie & Studio Ensembles) 
+Jenny Slate 	44 	0.020674 	Animated & Comedy Ensemble Bridge 
+Olivia Colman 	43 	0.019110 	Award Drama & Ensemble Hub 
+Bella Thorne 	36 	0.021971 	High Betweenness Bridge (Youth Comedy / Thrillers) 
+Charlie Day 	27 	0.021484 	High Betweenness Bridge across Studio Comedies 
+ 
+6.7 Interpretation 
+•	Degree Leaders: Actors like Jason Sudeikis and Nick Frost exhibit high degree centrality ($C_D = 54$), reflecting frequent involvement in large ensemble comedies and multi-cast productions.  
+•	Betweenness "Bridges": Actors such as J.K. Simmons ($C_B = 0.022759$) and Bella Thorne ($C_B = 0.021971$) show high betweenness centrality relative to their degree. These actors act as structural bridges connecting disparate genre clusters (e.g., bridging independent comedy productions with mainstream studio features). 
+ 
+6.8 Network Limitations 
+1) Cast Depth Constraint: Limitation of data gathering on casts listed in the cast.csv file will ignore small supporting roles that could otherwise link isolated nodes.  
+  
+2) Sample Size Limit: Sample of 500 movies in 10 years has missing links in the network where intermediate movies not collected would fill in real-life relationships.  
+  
+3) Static Nature of Data: The aggregation of data from 10 years into one graph ignores the evolution of actor's careers over time. 
+ 
+
+  
+7.	Overall Findings and Discussion 
+
+7.1 Key Findings 
+The research studied the popularity of movies, ratings provided by their audiences, their narrative content and collaborations among actors using a dataset consisting of 500 movies taken from the Movie Database (TMDb). There were four methods used for analyzing different aspects of movies’ attributes and audiences’ reactions to them. 
+During the text analysis, frequently used words were determined including life, world, family and friends, reflecting the presence of interpersonal relationships, personal experience and conflict stories in descriptions of movies. Comparison of popularity groups showed that movies which had higher popularity contained more often words like world, powerful and mysterious while less popular movies used more frequently such words as relationship, mother and love. Still, these differences were quite small. 
+The results of hypothesis testing showed a statistically significant difference between the audience ratings for horror and comedy movies. While comedy movies had an average rating of M = 6.42, horror movies had an average rating of M = 5.89, which is a difference of approximately 0.53 points (p < 0.001). This indicates that there is a difference in audience reception of movies depending on genre among the sample of movies considered. 
+Clustering revealed four categories of narratives described by the respondents: action/crime, character/relationship, horror/supernatural, and science fiction/fantasy. Clustering shows that movies have a few recurrent themes in their descriptions, which can be further explored computationally. 
+Network analysis investigated collaboration between the actors featured in the sample of movies. The network consisted of 4,132 actors and 21,435 connections; 75.9% of the nodes were part of a big component in the network. Centrality measures revealed the most central actors of the network as Jason Sudeikis, Nick Frost and J.K. Simmons. 
+
+7.2 Connections Between Analyses 
+While each analytical approach was applied to answer a unique research question, all these analyses provide some insights on the correlation between the movie content and its reception as well as industry cooperation. 
+Text analysis and clustering focused on different aspects of movie narratives. Word-frequency analysis revealed common words used to describe movies, while clustering was used to categorize the movies according to the text similarity. The high frequency of words related to relationships and conflict in the text analysis results correlates with the presence of clusters characterizing character stories, action movies and horror stories. 
+The hypothesis testing analysis provided another perspective in terms of studying differences in ratings of various genres. While the clustering analysis highlighted horror-related clusters, the statistical analysis demonstrated that horror films had lower average ratings compared to the comedy films. However, no evidence has been obtained about the role of certain themes in explaining these differences. 
+The comparison of popularity also indicates that some narrative terms exist in higher frequency among different popularity groups. However, TMDb popularity and ratings are not the same measures, as the former is related to the platform activities, while the latter is the evaluation of the film by users. For this reason, the results obtained cannot be considered as proof of the direct influence of some narrative terms on the success of movies. 
+Network analysis also revealed the structure of collaborations in the process of film creation. Actors with high degree centrality collaborated with more co-stars, while actors with high betweenness centrality connected different parts of the network. In this way, network approach provided an additional perspective for the research. 
+In summary, all four approaches demonstrate how different approaches can be used to explore various aspects of the film industry. 
+
+
+
+7.3 Limitations 
+A number of limitations must be taken into account when interpreting the results. 
+ 
+•	Firstly, the sample included 500 films in English produced in the period from 2015 to 2024 and having no less than 100 votes on TMDb. Moreover, the sample included more horror and comedy films than other genres. This means that the sample does not fully represent the world film market, and hence the results cannot be generalised for all films. 
+ 
+•	Secondly, the ratings on TMDb are voluntary submissions of platform users and do not necessarily represent the preferences of a wider group of viewers. Thirdly, the same can be said about the TMDb popularity scores which depend on users' activities and can change over time. 
+ 
+•	Thirdly, text analysis was based on movie descriptions and not on complete scripts. While the frequency analysis showed common words, the context of their use was not revealed. In addition, the comparison of popularity was not controlled for characteristics such as genre, production year or marketing influence. 
+ 
+•	Fourth, the cluster analysis was based on the process of preprocessing of data, text representation, the choice of distance metrics and the number of clusters. It is possible to say that the obtained average value of the silhouette score – 0.18 indicates poor separation of clusters, so their thematic interpretation could be considered exploratory. 
+
+Finally, the actor collaboration network comprised the top ten actors for each of the movies considered. It means that the network did not include other actors and collaborations that might have occurred outside of the sample. As a consequence, the measures of centrality refer to the actors’ position in the constructed sample network. 
+The mentioned limitations show that the research results could be considered exploratory in nature. 
+
+8. Conclusion 
+The current study has examined the popularity, audience rating, themes and collaborations of movies on the basis of data collected from 500 movies using TMDb. The use of different methods like text analysis, hypothesis testing, clustering and network analysis has proved that multiple approaches could be used to analyze movie attributes. 
+The text analysis has found that there is repetition in narratives and some small differences exist in the description of higher and lower popularity movies. Hypothesis testing has shown that there are significantly higher average audience ratings for comedy movies in comparison to horror movies. It seems that there are four main groups of movies based on themes according to clustering and the collaboration and popular actors in the selected network have been detected using network analysis. 
+Generally, the results show that movie descriptions, audience opinions and collaboration networks have some features that can be studied using social web analytics. However, no causal relationship exists between those characteristics and the success of movies in the current study. 
+Future research might benefit from using larger datasets as well as different measures like box-office revenues. 
+
+ 
+References 
+•	Getting Started. (n.d.). The Movie Database (TMDB). Retrieved October 9, 2026, from https://developer.themoviedb.org/docs/getting-started 
+•	Aggarwal, C. C., & Zhai, C. (2012). Mining text data. Springer Science & Business Media. 
+•	Barabási, A.-L. (2016). Network science. Cambridge University Press. 
+•	Feinerer, I., Hornik, K., & Meyer, D. (2008). Text mining infrastructure in R. Journal of Statistical Software, 25(5), 1–54. 
+•	Freeman, L. C. (1978). Centrality in social networks: Conceptual clarification. Social Networks, 1(3), 215–239. 
+•	Fruchterman, T. M., & Reingold, E. M. (1991). Graph drawing by force-directed placement. Software: Practice and Experience, 21(11), 1129–1164. 
+•	Manning, C. D., Raghavan, P., & Schütze, H. (2008). Introduction to information retrieval. Cambridge University Press. 
+•	Murtagh, F., & Legendre, P. (2014). Ward’s hierarchical agglomerative clustering method: Which algorithms implement Ward’s criterion? Journal of Classification, 31(3), 274–295. 
+•	Newman, M. E. J. (2010). Networks: An introduction. Oxford University Press. 
+•	Rousseeuw, P. J. (1987). Silhouettes: A graphical aid to the interpretation and validation of cluster analysis. Journal of Computational and Applied Mathematics, 20, 53–65.  
+•	Salton, G., & Buckley, C. (1988). Term-weighting approaches in automatic text retrieval. Information Processing & Management, 24(5), 513–523. 
+•	Silge, J., & Robinson, D. (2017). Text mining with R: A tidy approach. O'Reilly Media. 
+•	Silge, J., & Robinson, D. (2016). tidytext: Text mining and analysis using tidy data principles in R. Journal of Open Source Software, 1(3), 37. 
+•	Silge, J., & Robinson, D. (2016). tidytext: Text mining and analysis using tidy data principles in R. Journal of Open Source Software, 1(3), 37.
+
