@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
                       fig.width = 6, fig.height = 4, dpi = 150)
 ```
 
-Run this file in the same folder as `movies.csv`. First run only: `install.packages(c("dplyr", "readr", "ggplot2", "knitr"))`
+
 
 ```{r packages}
 library(dplyr)
