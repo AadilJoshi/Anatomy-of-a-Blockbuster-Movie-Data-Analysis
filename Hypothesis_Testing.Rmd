@@ -1,0 +1,155 @@
+---
+title: "RQ2: Hypothesis Testing - Horror vs Comedy Audience Ratings"
+author: "Aadil Joshi"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 6, fig.height = 4, dpi = 150)
+```
+
+Run this file in the same folder as `movies.csv`. First run only: `install.packages(c("dplyr", "readr", "ggplot2", "knitr"))`
+
+```{r packages}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(knitr)
+```
+
+# 4.1 Research question and hypotheses
+
+**RQ2:** Is there a statistically significant difference in average audience ratings between horror and comedy films?
+
+- **H0:** mean rating (horror) = mean rating (comedy)
+- **H1:** mean rating (horror) != mean rating (comedy)
+- Two-sided test, significance level alpha = 0.05
+- Outcome variable: `vote_average` (mean TMDb user rating, 0 to 10)
+
+# Data and groups
+
+TMDb genre IDs: 27 = Horror, 35 = Comedy. The `genre_ids` column looks like `27|53`.
+Films tagged as **both** horror and comedy are excluded so the two groups do not overlap.
+
+```{r groups}
+movies <- read_csv("movies.csv", col_types = cols(genre_ids = col_character()))
+
+has_genre <- function(x, id) grepl(paste0("(^|\\|)", id, "(\\||$)"), x)
+
+n_both <- sum(has_genre(movies$genre_ids, 27) & has_genre(movies$genre_ids, 35))
+
+dat <- movies %>%
+  mutate(horror = has_genre(genre_ids, 27),
+         comedy = has_genre(genre_ids, 35)) %>%
+  filter(xor(horror, comedy)) %>%          # exactly one of the two genres
+  mutate(genre = factor(if_else(horror, "Horror", "Comedy"),
+                        levels = c("Horror", "Comedy")))
+
+group_n <- table(dat$genre)
+group_n
+if (any(group_n < 50)) warning("A group has fewer than 50 films - collect more horror/comedy films.")
+```
+
+Of the `r nrow(movies)` films collected, `r n_both` were tagged as both horror and comedy and were excluded. The test uses `r group_n["Horror"]` horror films and `r group_n["Comedy"]` comedy films.
+
+# Descriptive statistics
+
+```{r descriptives}
+desc <- dat %>%
+  group_by(genre) %>%
+  summarise(n = n(),
+            mean = mean(vote_average),
+            sd = sd(vote_average),
+            median = median(vote_average),
+            .groups = "drop")
+
+kable(desc, digits = 2, caption = "Table 2. Descriptive statistics of audience ratings (vote_average)")
+```
+
+```{r boxplot}
+ggplot(dat, aes(genre, vote_average, fill = genre)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(title = "Audience ratings: horror vs comedy films",
+       x = NULL, y = "TMDb average rating (0-10)")
+```
+
+*Figure 1. Box plots of ratings by genre. The white diamond marks the group mean.*
+
+# 4.2 Checking the assumptions
+
+Welch's two-sample t-test needs independent groups (guaranteed by the design), approximately normal sampling distributions of the mean (checked below; each group also has at least 50 films), and does **not** need equal variances.
+
+```{r qqplot}
+ggplot(dat, aes(sample = vote_average)) +
+  stat_qq() + stat_qq_line() +
+  facet_wrap(~ genre) +
+  labs(title = "Normal Q-Q plots of average rating",
+       x = "Theoretical quantiles", y = "Sample quantiles")
+```
+
+```{r normality}
+shapiro_h <- shapiro.test(dat$vote_average[dat$genre == "Horror"])
+shapiro_c <- shapiro.test(dat$vote_average[dat$genre == "Comedy"])
+shapiro_h
+shapiro_c
+```
+
+```{r variance}
+vt <- var.test(vote_average ~ genre, data = dat)
+vt
+```
+
+# 4.3 Results
+
+```{r tests}
+# Welch two-sample t-test (does not assume equal variances)
+tt <- t.test(vote_average ~ genre, data = dat, var.equal = FALSE, conf.level = 0.95)
+tt
+
+# Wilcoxon rank-sum test (robustness check, no normality assumption)
+wt <- wilcox.test(vote_average ~ genre, data = dat, conf.int = TRUE)
+wt
+```
+
+```{r effectsize}
+# Cohen's d (pooled SD); difference = Horror - Comedy
+hr <- desc[desc$genre == "Horror", ]
+cm <- desc[desc$genre == "Comedy", ]
+sd_pooled <- sqrt(((hr$n - 1) * hr$sd^2 + (cm$n - 1) * cm$sd^2) / (hr$n + cm$n - 2))
+d <- (hr$mean - cm$mean) / sd_pooled
+diff_means <- hr$mean - cm$mean
+
+fmt_p <- function(p) if (p < 0.001) "< 0.001" else sprintf("%.3f", p)
+
+d_label <- case_when(abs(d) < 0.2 ~ "negligible",
+                     abs(d) < 0.5 ~ "small",
+                     abs(d) < 0.8 ~ "medium",
+                     TRUE ~ "large")
+reject <- tt$p.value < 0.05
+```
+
+**Welch two-sample t-test.** Horror films had a mean rating of `r sprintf("%.2f", hr$mean)` (SD = `r sprintf("%.2f", hr$sd)`, n = `r hr$n`) and comedy films `r sprintf("%.2f", cm$mean)` (SD = `r sprintf("%.2f", cm$sd)`, n = `r cm$n`), a difference of `r sprintf("%.2f", diff_means)` points (horror minus comedy). The test gave t(`r sprintf("%.1f", tt$parameter)`) = `r sprintf("%.2f", tt$statistic)`, p `r ifelse(tt$p.value < 0.001, "< 0.001", paste("=", fmt_p(tt$p.value)))`, with a 95% confidence interval for the difference of [`r sprintf("%.2f", tt$conf.int[1])`, `r sprintf("%.2f", tt$conf.int[2])`]. Cohen's d = `r sprintf("%.2f", d)` (`r d_label`).
+
+**Assumption checks.** Shapiro-Wilk: horror W = `r sprintf("%.3f", shapiro_h$statistic)` (p `r ifelse(shapiro_h$p.value < 0.001, "< 0.001", paste("=", fmt_p(shapiro_h$p.value)))`), comedy W = `r sprintf("%.3f", shapiro_c$statistic)` (p `r ifelse(shapiro_c$p.value < 0.001, "< 0.001", paste("=", fmt_p(shapiro_c$p.value)))`). F test for equal variances: p `r ifelse(vt$p.value < 0.001, "< 0.001", paste("=", fmt_p(vt$p.value)))`.
+
+**Robustness check.** The Wilcoxon rank-sum test gave p `r ifelse(wt$p.value < 0.001, "< 0.001", paste("=", fmt_p(wt$p.value)))`, which `r ifelse((wt$p.value < 0.05) == reject, "agrees", "disagrees")` with the t-test at the 5% level.
+
+# 4.4 Interpretation
+
+At the 5% significance level, the test **`r ifelse(reject, "provides sufficient evidence to reject H0", "does not provide sufficient evidence to reject H0")`**. `r if (reject) paste0("Horror and comedy films in this sample differ in average rating: ", ifelse(diff_means > 0, "horror", "comedy"), " films were rated about ", sprintf("%.2f", abs(diff_means)), " points higher on average.") else paste0("There is no clear evidence that average ratings differ between horror and comedy films; the observed difference of ", sprintf("%.2f", abs(diff_means)), " points is consistent with chance variation.")` The effect size is `r d_label` (Cohen's d = `r sprintf("%.2f", d)`).
+
+Statistical significance does not by itself mean the difference matters in practice, so both the p-value and the effect size are needed to answer RQ2. The result describes association, not cause. The sample is stratified rather than random, only films with at least 100 votes are included, and ratings come from a self-selected group of TMDb users, so the finding applies to films like those in this sample.
+
+In the context of the overall investigation, RQ2 adds the audience-reception side of the story. If a rating difference exists, the themes in the plot descriptions and the clusters can help suggest what content characteristics may be associated with it. If no difference exists, genre alone does not explain how audiences rate films, and other factors such as plot, cast or popularity should be considered.
+
+
+```{r}
+cast <- read.csv("cast.csv")
+nrow(cast)
+```
+
